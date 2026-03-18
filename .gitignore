@@ -4,3 +4,4 @@ __pycache__/
 .vscode
 build/
 .arduino/
+token.txt
