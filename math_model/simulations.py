@@ -9,28 +9,32 @@ length_ab, length_bc = 19, 18
 min_alpha, min_beta, min_gamma = 0, 35, 32
 max_alpha, max_beta, max_gamma = 270, 100, 127
 
+#Clamping Function
+def clamp(val, min_val, max_val):
+    return max(min_val, min(max_val, val))
+
 #Proccress D2 Function generating angles from position
 def generate_angle(x, y, z):
     try:
-        r = math.sqrt(x** 2 + y ** 2)
+        r = math.sqrt(x ** 2 + y ** 2)
+        pho = math.sqrt(x** 2 + y ** 2 + z ** 2)
 
         alpha_radians = math.atan2(y, x)
-        if alpha_radians < 0:
-            alpha_radians += 2 * math.pi
 
-        phi = math.acos((length_ab ** 2 + x ** 2 + y ** 2 - length_bc ** 2) / (2 * length_ab * r))
+        cos_phi = (length_ab ** 2 + pho ** 2 - length_bc ** 2) / (2 * length_ab * pho)
+        cos_phi = clamp(cos_phi, -1, 1)
+        phi = math.acos(cos_phi)
         omega = math.atan2(z, r)
-        if omega < 0:
-            omega += 2 * math.pi
 
         beta_radians = phi + omega
 
-        gamma_radians = math.acos((length_ab ** 2 + length_bc ** 2 - r ** 2) / (2 * length_ab * length_bc))
+        cos_gamma = (length_ab ** 2 + length_bc ** 2 - pho ** 2) / (2 * length_ab * length_bc)
+        cos_gamma = clamp(cos_gamma, -1, 1)
+        gamma_radians = math.acos(cos_gamma)
 
-        conversion_factor_to_degrees = 180 / math.pi
-        alpha = alpha_radians * conversion_factor_to_degrees
-        beta =  beta_radians * conversion_factor_to_degrees
-        gamma = gamma_radians * conversion_factor_to_degrees
+        alpha = math.degrees(alpha_radians)
+        beta =  math.degrees(beta_radians)
+        gamma = math.degrees(gamma_radians)
 
         if not min_alpha < alpha < max_alpha:
             raise ValueError(f'Alpha angle is out of range: {alpha}')
@@ -50,10 +54,9 @@ Testing Code
 """
 #Inverse of D2 Function position from angles
 def angles_to_postion(alpha, beta, gamma):
-    conversion = math.pi / 180
-    alpha_radian = alpha * conversion
-    beta_radian = beta * conversion
-    gamma_radian = gamma * conversion
+    alpha_radian = math.radians(alpha)
+    beta_radian = math.radians(beta)
+    gamma_radian = math.radians(gamma)
 
     x = (length_ab * math.cos(beta_radian) - length_bc * math.cos(gamma_radian + beta_radian)) * math.cos(alpha_radian)
     y = (length_ab * math.cos(beta_radian) - length_bc * math.cos(gamma_radian + beta_radian)) * math.sin(alpha_radian)
@@ -63,14 +66,14 @@ def angles_to_postion(alpha, beta, gamma):
 
 #Checks the percent difference between input position and output position
 def check_postion(input_coordinate, output_coordinate):
-    input_distance = math.sqrt(sum([coordinate ** 2 for coordinate in input_coordinate]))
-    output_distance = math.sqrt(sum([coordinate ** 2 for coordinate in output_coordinate]))
+    cooridinate_coupled = list(zip(list(input_coordinate), list(output_coordinate)))
+    
+    difference = math.sqrt(sum([(coorid_input - coorid_output) ** 2 for coorid_input, coorid_output in cooridinate_coupled]))
+    total_distance = math.sqrt(sum([cooridinate ** 2 for cooridinate in input_coordinate]))
 
-    max_cooridinates = list(angles_to_postion(max_alpha, max_beta, max_gamma))
-    max_distance = math.sqrt(sum(cooridinate ** 2 for cooridinate in max_cooridinates))
-    difference = abs(input_distance - output_distance) / input_distance
+    error = difference / total_distance
 
-    return difference
+    return error
 
 #Defining Test iterations
 iterations = 10
