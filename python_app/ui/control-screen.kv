@@ -1,0 +1,15 @@
+<MainJoystick>:
+    size_hint: 0.7, 0.7
+
+    canvas:
+        Color:
+            rgba: 0.5, 0.5, 0.5, 0.5
+        Line:
+            circle: (self.center_x, self.center_y, self.width / 2)
+            width: 2
+
+        Color:
+            rgba: 1, 1, 1, 0.8
+        Ellipse:
+            pos: (self.pad_x - self.width / 4, self.pad_y - self.width / 4)
+            size: self.width / 2, self.width / 2
