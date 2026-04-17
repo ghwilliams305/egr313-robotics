@@ -1,6 +1,6 @@
 from kivy.uix.widget import Widget
 from kivy.uix.slider import Slider
-from kivy.properties import NumericProperty, ReferenceListProperty, ObjectProperty
+from kivy.properties import NumericProperty, ReferenceListProperty, ObjectProperty, BooleanProperty
 from kivy.vector import Vector
 
 class ZAxisSlider(Slider):
@@ -17,6 +17,7 @@ class MainJoystick(Widget):
     pad_y = NumericProperty(0)
     pad_pos = ReferenceListProperty(pad_x, pad_y)
     joystick_vector = ObjectProperty(Vector(0, 0))
+    suction = NumericProperty(0)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -27,6 +28,13 @@ class MainJoystick(Widget):
         if self.collide_point(*touch.pos):
             touch.grab(self)
             self.update_pad(touch.pos)
+
+            if touch.is_double_tap:
+                if self.suction == 0:
+                    self.suction = 1
+                else:
+                    self.suction = 0
+
             return True
         
         return super().on_touch_down(touch)

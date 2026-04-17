@@ -1,4 +1,11 @@
 #include <cmath>
+#include "BluetoothSerial.h"
+
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
+
+BluetoothSerial SerialBT;
 
 //Defining Arm Values
 int lengthAB = 19, lengthBC = 18;
@@ -79,9 +86,22 @@ double generateAngle(int x = 0, int y = 0, int z = 0) {
 
 void setup() {
     //Setup Function
-    //Get Starting 
+    //Get Starting
+    Serial.begin(115200);
+    SerialBT.begin("roboticARM");
+    Serial.println("The device started, now you can pair it with bluetooth!");
 }
 
-void loo() {
+void loop() {
     //Main function
+    if (SerialBT.available()) {
+        String received = SerialBT.readStringUntil(']');
+        received.trim();
+
+        if (received.length() > 0) {
+            Serial.println(received);
+        }
+    }
+
+    delay(20);
 }
