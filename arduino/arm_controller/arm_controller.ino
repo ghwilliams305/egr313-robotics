@@ -4,10 +4,15 @@
 #include <Adafruit_MCP23X17.h>
 #include <Adafruit_AS5600.h>
 #include <ArduinoJson.h>
+#include <BitBang_I2C.h>
 
 //SET PINS FOR I2C
-#define I2C_SDA 33
-#define I2C_SCL 32
+#define I2C_ALPHA_SDA 21
+#define I2C_ALPHA_SCL 22
+#define I2C_BETA_SDA 18
+#define I2C_BETA_SCL 19
+#define I2C_GAMMA_SDA 32
+#define I2C_GAMMA_SCL 33
 
 //Set pins for soleiod drivers
 #define ALPHA_IN 0
@@ -16,8 +21,11 @@
 #define BETA_OUT 3
 #define GAMMA_IN 4
 #define GAMMA_OUT 5
-#define SUCTION_IN 6
-#define SUCTION_OUT 7
+#define BETA_LOCK 6
+#define GAMMA_LOCK 7
+
+//Other pins
+#define SUCTION 14
 
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
@@ -27,11 +35,10 @@ BluetoothSerial SerialBT;
 Adafruit_MCP23X17 mcp;
 Adafruit_AS5600 as5600Alpha;
 Adafruit_AS5600 as5600Beta;
-Adafruit_AS5600 as5600Gamma;
+BBI2C sw_gamma_bus;
 
 TwoWire I2CALPHA = TwoWire(0);
 TwoWire I2CBETA = TwoWire(1);
-TwoWire I2CGAMMA = TwoWire(2);
 
 //Defining Arm Values
 int lengthAB = 19, lengthBC = 18;
@@ -44,6 +51,34 @@ double clamp(double val, double minVal, double maxVal) {
     return fmax(minVal, fmin(maxVal, val));
 }
 
+int clampAngle(int angleValue, char angleName) {
+    if (angleName == 'a') {
+        if (angleValue > maxAlpha) {
+            return maxAlpha;
+        } else if (angleValue < minAlpha) {
+            return minAlpha;
+        } else {
+            return angleValue;
+        }
+    } else if (angleName == 'b') {
+        if (angleValue > maxBeta) {
+            return maxBeta;
+        } else if (angleValue < minBeta) {
+            return minBeta;
+        } else {
+            return angleValue;
+        }
+    } else if (angleName == 'g') {
+        if (angleValue > maxGamma) {
+            return maxGamma;
+        } else if (angleValue < minGamma) {
+            return minGamma;
+        } else {
+            return angleValue;
+        }
+    }
+}
+
 //Proccess D2 Functions generating angles from postion (copied from simulations.py)
 //Generating Alpha angle
 int generateAlphaAngle(float x = 0, float y = 0) {
@@ -52,7 +87,7 @@ int generateAlphaAngle(float x = 0, float y = 0) {
         double alphaRadians = atan2(y, x);
         double alpha = alphaRadians * (180.0 / M_PI);
 
-        if(alpha < minAlpha && alpha > maxAlpha) {
+        if(alpha < minAlpha || alpha > maxAlpha) {
             throw 444;
         }
 
@@ -78,7 +113,7 @@ int generateBetaAngle(float x = 0, float y = 0, float z = 0) {
 
         double beta = betaRadians * (180.0 / M_PI);
 
-        if(beta < minBeta && beta > maxBeta) {
+        if(beta < minBeta || beta > maxBeta) {
             throw 444;
         }
 
@@ -100,7 +135,7 @@ int generateGammaAngle(float x = 0, float y = 0, float z = 0) {
 
         double gamma = gammaRadians * (180.0 / M_PI);
 
-        if(gamma < minGamma && gamma > maxGamma) {
+        if(gamma < minGamma || gamma > maxGamma) {
             throw 444;
         }
 
@@ -131,9 +166,8 @@ void setup() {
     //Setup Function
     //Get Starting
     Serial.begin(115200);
-    I2CALPHA.begin(21, 22, 100000);
-    I2CBETA.begin(18, 19, 100000);
-    I2CGAMMA.begin(35, 34, 100000);
+    I2CALPHA.begin(I2C_ALPHA_SDA, I2C_ALPHA_SCL, 100000);
+    I2CBETA.begin(I2C_BETA_SDA, I2C_BETA_SCL, 100000);
 
     SerialBT.begin("roboticARM");
     Serial.println("The device started, now you can pair it with bluetooth!");
@@ -162,13 +196,14 @@ void setup() {
 
     Serial.println("as5600 Beta found!");
 
-    if (!as5600Gamma.begin(0x36, &I2CGAMMA)) {
-        Serial.println("Could not find as5600 Gamma, checking!");
-        while (1)
-            delay(10);
-    }
+    //Set Up Virtual Gamma
+    memset(&sw_gamma_bus, 0, sizeof(sw_gamma_bus));
+    sw_gamma_bus.bWire = 0;
+    sw_gamma_bus.iSDA = I2C_GAMMA_SDA;
+    sw_gamma_bus.iSCL = I2C_GAMMA_SCL;
+    I2CInit(&sw_gamma_bus, 100000);
 
-    Serial.println("as5600 Gamma found!");
+    Serial.println("as5600 Gamma Initialized");
 
     //Configuring the AS5600 sensors (Alpha, Beta, and Gmma)
     as5600Alpha.enableWatchdog(false);
@@ -177,20 +212,14 @@ void setup() {
     as5600Beta.enableWatchdog(false);
     as5600Beta.setPowerMode(AS5600_POWER_MODE_NOM);
     as5600Beta.setHysteresis(AS5600_HYSTERESIS_OFF);
-    as5600Gamma.enableWatchdog(false);
-    as5600Gamma.setPowerMode(AS5600_POWER_MODE_NOM);
-    as5600Gamma.setHysteresis(AS5600_HYSTERESIS_OFF);
 
     as5600Alpha.setOutputStage(AS5600_OUTPUT_STAGE_ANALOG_FULL);
     as5600Beta.setOutputStage(AS5600_OUTPUT_STAGE_ANALOG_FULL);
-    as5600Gamma.setOutputStage(AS5600_OUTPUT_STAGE_ANALOG_FULL);
 
     as5600Alpha.setSlowFilter(AS5600_SLOW_FILTER_16X);
     as5600Alpha.setFastFilterThresh(AS5600_FAST_FILTER_THRESH_SLOW_ONLY);
     as5600Beta.setSlowFilter(AS5600_SLOW_FILTER_16X);
     as5600Beta.setFastFilterThresh(AS5600_FAST_FILTER_THRESH_SLOW_ONLY);
-    as5600Gamma.setSlowFilter(AS5600_SLOW_FILTER_16X);
-    as5600Gamma.setFastFilterThresh(AS5600_FAST_FILTER_THRESH_SLOW_ONLY);
 
     as5600Alpha.setZPosition(0);
     as5600Alpha.setMPosition(4095);
@@ -198,9 +227,9 @@ void setup() {
     as5600Beta.setZPosition(0);
     as5600Beta.setMPosition(4095);
     as5600Beta.setMaxAngle(4095);
-    as5600Gamma.setZPosition(0);
-    as5600Gamma.setMPosition(4095);
-    as5600Gamma.setMaxAngle(4095);
+
+    //Set Up Suction Value
+    pinMode(SUCTION, OUTPUT);
 
     //configure soleoid pins
     mcp.pinMode(ALPHA_IN, OUTPUT);
@@ -209,8 +238,8 @@ void setup() {
     mcp.pinMode(BETA_OUT, OUTPUT);
     mcp.pinMode(GAMMA_IN, OUTPUT);
     mcp.pinMode(GAMMA_OUT, OUTPUT);
-    mcp.pinMode(SUCTION_IN, OUTPUT);
-    mcp.pinMode(SUCTION_OUT, OUTPUT);
+    mcp.pinMode(BETA_LOCK, OUTPUT);
+    mcp.pinMode(GAMMA_LOCK, OUTPUT);
 }
 
 void loop() {
@@ -220,8 +249,23 @@ void loop() {
     int alphaAngleDegrees = (alphaAngle * 360) / 4095;
     uint16_t betaAngle = as5600Beta.getAngle();
     int betaAngleDegrees = (betaAngle * 360) / 4095;
-    uint16_t gammaAngle = as5600Gamma.getAngle();
-    int gammaAngleDegrees = (gammaAngle * 360) / 4095;
+    int gammaAngleDegrees = 0;
+
+    //Get Gamma Sensor Value
+    uint8_t reg = 0x0E;
+    I2CWrite(&sw_gamma_bus, 0x36, &reg, 1);
+
+    uint8_t buffer[2];
+    if (I2CReadRegister(&sw_gamma_bus, 0x36, 0x0E, buffer, 2)) {
+        uint16_t gammaAngle = ((uint16_t)buffer[0] << 8) | buffer[1];
+        gammaAngleDegrees = (gammaAngle * 360) / 4095;
+    } else {
+        Serial.println("Gamma data not found");
+    }
+
+    alphaAngleDegrees = clampAngle(alphaAngleDegrees, 'a');
+    betaAngleDegrees = clampAngle(betaAngleDegrees, 'b');
+    gammaAngleDegrees = clampAngle(gammaAngleDegrees, 'g');
 
     //Get Current Position
     float currentX = generatePos(alphaAngleDegrees, betaAngleDegrees, gammaAngleDegrees, 'x');
@@ -250,17 +294,14 @@ void loop() {
             dy = doc[1];
             dz = doc[2];
 
-            dx /= sensitivity;
-            dy /= sensitivity;
-            dz /= sensitivity;
             suction = doc[3];
         }
     }
 
     //Changing position
-    targetX = targetX + dx;
-    targetY = targetY + dy;
-    targetZ = targetZ + dz;
+    targetX = currentX + dx;
+    targetY = currentY + dy;
+    targetZ = currentZ + dz;
 
     //Getting Target Angles
     int targetAlpha = generateAlphaAngle(targetX, targetY);
@@ -299,10 +340,10 @@ void loop() {
     Serial.print(")");
 
     //Seting Piston Trajectories
-    if (targetAlpha > alphaAngleDegrees) {
+    if (std::round(dx) > 0) {
         mcp.digitalWrite(ALPHA_OUT, HIGH);
         mcp.digitalWrite(ALPHA_IN, LOW);
-    } else if (targetAlpha < alphaAngleDegrees) {
+    } else if (std::round(dx) < 0) {
         mcp.digitalWrite(ALPHA_OUT, LOW);
         mcp.digitalWrite(ALPHA_IN, HIGH);
     } else {
@@ -310,34 +351,38 @@ void loop() {
         mcp.digitalWrite(ALPHA_IN, LOW);
     }
 
-    if (targetBeta> betaAngleDegrees) {
+    if (std::round(dy) > 0) {
+        mcp.digitalWrite(BETA_LOCK, HIGH);
         mcp.digitalWrite(BETA_OUT, HIGH);
         mcp.digitalWrite(BETA_IN, LOW);
-    } else if (targetBeta < betaAngleDegrees) {
+    } else if (std::round(dy) < 0) {
+        mcp.digitalWrite(BETA_LOCK, HIGH);
         mcp.digitalWrite(BETA_OUT, LOW);
         mcp.digitalWrite(BETA_IN, HIGH);
     } else {
+        mcp.digitalWrite(BETA_LOCK, LOW);
         mcp.digitalWrite(BETA_OUT, LOW);
         mcp.digitalWrite(BETA_IN, LOW);
     }
 
-    if (targetGamma> gammaAngleDegrees) {
+    if (std::round(dz) > 0) {
+        mcp.digitalWrite(GAMMA_LOCK, HIGH);
         mcp.digitalWrite(GAMMA_OUT, HIGH);
         mcp.digitalWrite(GAMMA_IN, LOW);
-    } else if (targetGamma < gammaAngleDegrees) {
+    } else if (std::round(dz) < 0) {
+        mcp.digitalWrite(GAMMA_LOCK, HIGH);
         mcp.digitalWrite(GAMMA_OUT, LOW);
         mcp.digitalWrite(GAMMA_IN, HIGH);
     } else {
+        mcp.digitalWrite(GAMMA_LOCK, LOW);
         mcp.digitalWrite(GAMMA_OUT, LOW);
         mcp.digitalWrite(GAMMA_IN, LOW);
     }
 
     if (suction == 0) {
-        mcp.digitalWrite(SUCTION_OUT, HIGH);
-        mcp.digitalWrite(SUCTION_IN, LOW);
+        digitalWrite(SUCTION, HIGH);
     } else {
-        mcp.digitalWrite(SUCTION_OUT, LOW);
-        mcp.digitalWrite(SUCTION_IN, HIGH);
+        digitalWrite(SUCTION, LOW);
     }
 
     Serial.println();
