@@ -45,6 +45,8 @@ int lengthAB = 19, lengthBC = 18;
 int minAlpha = 0, minBeta = 35, minGamma = 32;
 int maxAlpha = 270, maxBeta = 100, maxGamma = 127;
 float targetX = 0, targetY = 0, targetZ = 0;
+int suction = 0;
+float dx = 0, dy = 0, dz = 0;
 
 //Clamping Function
 double clamp(double val, double minVal, double maxVal) {
@@ -274,8 +276,6 @@ void loop() {
 
     //Finding where the robot is going
     //Set Up and get position change
-    float dx = 0, dy = 0, dz = 0, suction = 0;
-
     if (SerialBT.available()) {
         String received = SerialBT.readStringUntil(']') + ']';
         received.trim();
@@ -330,6 +330,8 @@ void loop() {
     Serial.print(dy);
     Serial.print(", ");
     Serial.print(dz);
+    Serial.print(", ");
+    Serial.print(suction);
     Serial.print(") -> ");
     Serial.print("Target: (");
     Serial.print(targetAlpha);
@@ -351,11 +353,11 @@ void loop() {
         mcp.digitalWrite(ALPHA_IN, LOW);
     }
 
-    if (std::round(dy) > 0) {
+    if (std::round(dy) < 0) {
         mcp.digitalWrite(BETA_LOCK, HIGH);
         mcp.digitalWrite(BETA_OUT, HIGH);
         mcp.digitalWrite(BETA_IN, LOW);
-    } else if (std::round(dy) < 0) {
+    } else if (std::round(dy) > 0) {
         mcp.digitalWrite(BETA_LOCK, HIGH);
         mcp.digitalWrite(BETA_OUT, LOW);
         mcp.digitalWrite(BETA_IN, HIGH);
@@ -379,7 +381,7 @@ void loop() {
         mcp.digitalWrite(GAMMA_IN, LOW);
     }
 
-    if (suction == 0) {
+    if (suction == 1) {
         digitalWrite(SUCTION, HIGH);
     } else {
         digitalWrite(SUCTION, LOW);
