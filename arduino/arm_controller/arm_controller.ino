@@ -182,53 +182,53 @@ void setup() {
 
     Serial.println("MCP found!");
 
-    if (!as5600Alpha.begin(0x36, &I2CALPHA)) {
-        Serial.println("Could not find as5600 Alpha, checking!");
-        while (1)
-            delay(10);
-    }
+    //if (!as5600Alpha.begin(0x36, &I2CALPHA)) {
+    //    Serial.println("Could not find as5600 Alpha, checking!");
+    //    while (1)
+    //        delay(10);
+    //}
 
-    Serial.println("as5600 Alpha found!");
+    //Serial.println("as5600 Alpha found!");
 
-    if (!as5600Beta.begin(0x36, &I2CBETA)) {
-        Serial.println("Could not find as5600 Beta, checking!");
-        while (1)
-            delay(10);
-    }
+    //if (!as5600Beta.begin(0x36, &I2CBETA)) {
+    //    Serial.println("Could not find as5600 Beta, checking!");
+    //    while (1)
+    //        delay(10);
+    //}
 
-    Serial.println("as5600 Beta found!");
+    //Serial.println("as5600 Beta found!");
 
     //Set Up Virtual Gamma
-    memset(&sw_gamma_bus, 0, sizeof(sw_gamma_bus));
-    sw_gamma_bus.bWire = 0;
-    sw_gamma_bus.iSDA = I2C_GAMMA_SDA;
-    sw_gamma_bus.iSCL = I2C_GAMMA_SCL;
-    I2CInit(&sw_gamma_bus, 100000);
+    //memset(&sw_gamma_bus, 0, sizeof(sw_gamma_bus));
+    //sw_gamma_bus.bWire = 0;
+    //sw_gamma_bus.iSDA = I2C_GAMMA_SDA;
+    //sw_gamma_bus.iSCL = I2C_GAMMA_SCL;
+    //I2CInit(&sw_gamma_bus, 100000);
 
-    Serial.println("as5600 Gamma Initialized");
+    //Serial.println("as5600 Gamma Initialized");
 
     //Configuring the AS5600 sensors (Alpha, Beta, and Gmma)
-    as5600Alpha.enableWatchdog(false);
-    as5600Alpha.setPowerMode(AS5600_POWER_MODE_NOM);
-    as5600Alpha.setHysteresis(AS5600_HYSTERESIS_OFF);
-    as5600Beta.enableWatchdog(false);
-    as5600Beta.setPowerMode(AS5600_POWER_MODE_NOM);
-    as5600Beta.setHysteresis(AS5600_HYSTERESIS_OFF);
+    //as5600Alpha.enableWatchdog(false);
+    //as5600Alpha.setPowerMode(AS5600_POWER_MODE_NOM);
+    //as5600Alpha.setHysteresis(AS5600_HYSTERESIS_OFF);
+    //as5600Beta.enableWatchdog(false);
+    //as5600Beta.setPowerMode(AS5600_POWER_MODE_NOM);
+    //as5600Beta.setHysteresis(AS5600_HYSTERESIS_OFF);
 
-    as5600Alpha.setOutputStage(AS5600_OUTPUT_STAGE_ANALOG_FULL);
-    as5600Beta.setOutputStage(AS5600_OUTPUT_STAGE_ANALOG_FULL);
+    //as5600Alpha.setOutputStage(AS5600_OUTPUT_STAGE_ANALOG_FULL);
+    //as5600Beta.setOutputStage(AS5600_OUTPUT_STAGE_ANALOG_FULL);
 
-    as5600Alpha.setSlowFilter(AS5600_SLOW_FILTER_16X);
-    as5600Alpha.setFastFilterThresh(AS5600_FAST_FILTER_THRESH_SLOW_ONLY);
-    as5600Beta.setSlowFilter(AS5600_SLOW_FILTER_16X);
-    as5600Beta.setFastFilterThresh(AS5600_FAST_FILTER_THRESH_SLOW_ONLY);
+    //as5600Alpha.setSlowFilter(AS5600_SLOW_FILTER_16X);
+    //as5600Alpha.setFastFilterThresh(AS5600_FAST_FILTER_THRESH_SLOW_ONLY);
+    //as5600Beta.setSlowFilter(AS5600_SLOW_FILTER_16X);
+    //as5600Beta.setFastFilterThresh(AS5600_FAST_FILTER_THRESH_SLOW_ONLY);
 
-    as5600Alpha.setZPosition(0);
-    as5600Alpha.setMPosition(4095);
-    as5600Alpha.setMaxAngle(4095);
-    as5600Beta.setZPosition(0);
-    as5600Beta.setMPosition(4095);
-    as5600Beta.setMaxAngle(4095);
+    //as5600Alpha.setZPosition(0);
+    //as5600Alpha.setMPosition(4095);
+    //as5600Alpha.setMaxAngle(4095);
+    //as5600Beta.setZPosition(0);
+    //as5600Beta.setMPosition(4095);
+    //as5600Beta.setMaxAngle(4095);
 
     //Set Up Suction Value
     pinMode(SUCTION, OUTPUT);
@@ -247,23 +247,23 @@ void setup() {
 void loop() {
     //Finding Where the robot is
     //Get Sensor Values
-    uint16_t alphaAngle = as5600Alpha.getAngle();
+    uint16_t alphaAngle = 0;//as5600Alpha.getAngle();
     int alphaAngleDegrees = (alphaAngle * 360) / 4095;
-    uint16_t betaAngle = as5600Beta.getAngle();
+    uint16_t betaAngle = 0;//as5600Beta.getAngle();
     int betaAngleDegrees = (betaAngle * 360) / 4095;
     int gammaAngleDegrees = 0;
 
     //Get Gamma Sensor Value
-    uint8_t reg = 0x0E;
-    I2CWrite(&sw_gamma_bus, 0x36, &reg, 1);
+    //uint8_t reg = 0x0E;
+    //I2CWrite(&sw_gamma_bus, 0x36, &reg, 1);
 
-    uint8_t buffer[2];
-    if (I2CReadRegister(&sw_gamma_bus, 0x36, 0x0E, buffer, 2)) {
-        uint16_t gammaAngle = ((uint16_t)buffer[0] << 8) | buffer[1];
-        gammaAngleDegrees = (gammaAngle * 360) / 4095;
-    } else {
-        Serial.println("Gamma data not found");
-    }
+    //uint8_t buffer[2];
+    //if (I2CReadRegister(&sw_gamma_bus, 0x36, 0x0E, buffer, 2)) {
+    //    uint16_t gammaAngle = ((uint16_t)buffer[0] << 8) | buffer[1];
+    //    gammaAngleDegrees = (gammaAngle * 360) / 4095;
+    //} else {
+    //    Serial.println("Gamma data not found");
+    //}
 
     alphaAngleDegrees = clampAngle(alphaAngleDegrees, 'a');
     betaAngleDegrees = clampAngle(betaAngleDegrees, 'b');
@@ -287,14 +287,14 @@ void loop() {
             if (error) {
                 Serial.print("deserializeJson() failed: ");
                 Serial.println(error.c_str());
+            } else {
+                int sensitivity = 100;
+                dx = doc[0];
+                dy = doc[1];
+                dz = doc[2];
+
+                suction = doc[3];
             }
-
-            int sensitivity = 100;
-            dx = doc[0];
-            dy = doc[1];
-            dz = doc[2];
-
-            suction = doc[3];
         }
     }
 
